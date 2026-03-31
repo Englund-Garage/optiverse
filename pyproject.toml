@@ -38,9 +38,8 @@ dev = [
 [project.urls]
 Homepage = "https://github.com/QPG-MIT/optiverse"
 
-[tool.setuptools]
-package-dir = {"" = "src"}
-packages = ["optiverse"]
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
