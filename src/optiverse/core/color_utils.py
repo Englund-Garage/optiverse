@@ -1,38 +1,75 @@
 from __future__ import annotations
 
+import re
+
 import numpy as np
-from PyQt6 import QtGui
+
+try:
+    from PyQt6 import QtGui
+
+    _HAS_PYQT6 = True
+except ImportError:
+    _HAS_PYQT6 = False
+
+_HEX_RE = re.compile(r"^#?([0-9a-fA-F]{6})$")
 
 
-def qcolor_from_hex(h: str, fallback: str = "#DC143C") -> QtGui.QColor:
+class _FallbackColor:
+    """Lightweight stand-in for QColor when PyQt6 is not installed."""
+
+    __slots__ = ("_r", "_g", "_b")
+
+    def __init__(self, r: int = 0, g: int = 0, b: int = 0):
+        self._r, self._g, self._b = r, g, b
+
+    def red(self) -> int:
+        return self._r
+
+    def green(self) -> int:
+        return self._g
+
+    def blue(self) -> int:
+        return self._b
+
+    def name(self) -> str:
+        return f"#{self._r:02x}{self._g:02x}{self._b:02x}"
+
+
+def _parse_hex(h: str) -> tuple[int, int, int] | None:
+    m = _HEX_RE.match(h.strip() if h else "")
+    if not m:
+        return None
+    hx = m.group(1)
+    return int(hx[0:2], 16), int(hx[2:4], 16), int(hx[4:6], 16)
+
+
+def qcolor_from_hex(h: str, fallback: str = "#DC143C"):
     """
-    Convert hex color string to QColor.
+    Convert hex color string to a color object.
 
-    Args:
-        h: Hex color string (e.g., "#DC143C")
-        fallback: Fallback hex string if h is invalid
-
-    Returns:
-        QColor instance
+    Returns a QColor when PyQt6 is available, otherwise a lightweight
+    _FallbackColor with the same .red()/.green()/.blue() interface.
     """
-    try:
-        c = QtGui.QColor(h)
-        return c if c.isValid() else QtGui.QColor(fallback)
-    except (TypeError, ValueError):
-        return QtGui.QColor(fallback)
+    if _HAS_PYQT6:
+        try:
+            c = QtGui.QColor(h)
+            return c if c.isValid() else QtGui.QColor(fallback)
+        except (TypeError, ValueError):
+            return QtGui.QColor(fallback)
+
+    rgb = _parse_hex(h)
+    if rgb is None:
+        rgb = _parse_hex(fallback) or (220, 20, 60)
+    return _FallbackColor(*rgb)
 
 
-def hex_from_qcolor(c: QtGui.QColor) -> str:
+def hex_from_qcolor(c) -> str:
     """
-    Convert QColor to hex color string.
+    Convert a color object to hex color string.
 
-    Args:
-        c: QColor instance
-
-    Returns:
-        Hex color string in format "#RRGGBB"
+    Works with both QColor and _FallbackColor.
     """
-    return c.name()  # Returns #RRGGBB format
+    return c.name()
 
 
 def wavelength_to_rgb(wavelength_nm: float) -> tuple[int, int, int]:
@@ -116,18 +153,16 @@ def wavelength_to_hex(wavelength_nm: float) -> str:
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
-def wavelength_to_qcolor(wavelength_nm: float) -> QtGui.QColor:
+def wavelength_to_qcolor(wavelength_nm: float):
     """
-    Convert wavelength to QColor.
+    Convert wavelength to a color object.
 
-    Args:
-        wavelength_nm: Wavelength in nanometers
-
-    Returns:
-        QColor instance
+    Returns QColor when PyQt6 is available, otherwise _FallbackColor.
     """
     r, g, b = wavelength_to_rgb(wavelength_nm)
-    return QtGui.QColor(r, g, b)
+    if _HAS_PYQT6:
+        return QtGui.QColor(r, g, b)
+    return _FallbackColor(r, g, b)
 
 
 # Common laser wavelengths (in nm) for reference
